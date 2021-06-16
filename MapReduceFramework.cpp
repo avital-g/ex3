@@ -39,7 +39,7 @@ struct ThreadContext {
     Barrier *barrier;
 //    int* bad_counter;
     JobContext *handle;
-    IntermediateVec intermediateVec;
+    IntermediateVec * intermediateVec;
 };
 bool sortPairs(const IntermediatePair &x, const IntermediatePair &y)
 {
@@ -61,7 +61,10 @@ bool sortPairs(const IntermediatePair &x, const IntermediatePair &y)
         (void) old_value;  // ignore not used warning    std::queue<IntermediateVec> queue_to_reduce;
         (*(tc->completed_task_counter))++;
     }
-    std::sort(tc->intermediateVec.begin(), tc->intermediateVec.end(), sortPairs);
+    if(! tc->intermediateVec->empty()){
+        std::sort(tc->intermediateVec->begin(), tc->intermediateVec->end(), sortPairs);
+    }
+
 
 //    tc-> num_of_threads_still_mapping--;
     (*(tc->num_of_threads_still_mapping))--;
@@ -95,7 +98,7 @@ std::mutex jobExecturorMapMutex;
 
 void emit2(K2 *key, V2 *value, void *context) {
     ThreadContext *tc = (ThreadContext *) context;
-    tc->intermediateVec.push_back({key, value});
+    tc->intermediateVec->push_back({key, value});
 //    key = tc ->
 
 }
@@ -173,6 +176,7 @@ void *executeJob(void *vPayload) {
 
     std::atomic<int> num_of_tasks_for_reduction(0);
     job->num_of_tastks_waiting_for_reduction = &num_of_tasks_for_reduction;
+    IntermediateVec intermediateVecList [multiThreadLevel];
 
     for (int i = 0; i < multiThreadLevel; i++) {
         std::string thread_num = std::to_string(i);
@@ -182,6 +186,7 @@ void *executeJob(void *vPayload) {
         threadContexts[i].completed_task_counter = &completed_tasks;
 
         threadContexts[i].handle = job;
+        threadContexts[i].intermediateVec = &intermediateVecList[i];
         iterations[i] = pthread_create(&thread_list[i], NULL, oneThreadJob, (void *) &threadContexts[i]);
     }
     //map & sort in the threads
@@ -203,8 +208,8 @@ void *executeJob(void *vPayload) {
 
     std::vector<IntermediateVec> vectorOfVectors;
     for (int thread_num = 0; thread_num < multiThreadLevel; thread_num++) {
-        if (!threadContexts[thread_num].intermediateVec.empty()) {
-            vectorOfVectors.push_back(threadContexts[thread_num].intermediateVec);
+        if (!threadContexts[thread_num].intermediateVec->empty()) {
+            vectorOfVectors.push_back(*threadContexts[thread_num].intermediateVec);
         }
     }
     //sort/shuffle_and_send_to_reduction_queue
