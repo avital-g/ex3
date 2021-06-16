@@ -279,5 +279,6 @@ void getJobState(JobHandle job, JobState *state) {
 }
 
 void closeJobHandle(JobHandle job) {
+//    pthread_cancel(jobExecutorMap[job]);
     delete (JobContext *) job;
 }
